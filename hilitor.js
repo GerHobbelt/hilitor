@@ -2,6 +2,8 @@
 // Please acknowledge use of this code by including this header.
 // 2/2013 jon: modified regex to display any match, not restricted to word boundaries.
 
+// License at http://www.the-art-of-web.com/copyright.html
+
 function Hilitor(id, tag, options)
 {
   var targetNode = document.getElementById(id) || document.body;
@@ -126,5 +128,4 @@ function Hilitor(id, tag, options)
     this.hiliteWords(targetNode);
     return options.onFinish.call(this);
   };
-
 }
