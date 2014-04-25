@@ -1,37 +1,39 @@
 // Original JavaScript code by Chirp Internet: www.chirp.com.au
 // Please acknowledge use of this code by including this header.
+// 2/2013 jon: modified regex to display any match, not restricted to word boundaries.
 
 function Hilitor(id, tag)
 {
-
   var targetNode = document.getElementById(id) || document.body;
   var hiliteTag = tag || "EM";
   var skipTags = new RegExp("^(?:" + hiliteTag + "|SCRIPT|FORM|SPAN)$");
-  var colors = ["#ff6"];
+  var colors = ["#ff6", "#a0ffff", "#9f9", "#f99", "#f6f"];
   var wordColor = [];
   var colorIdx = 0;
   var matchRegex = "";
 
-  this.setRegex = function(input)
+  this.setRegex = function (input)
   {
-    input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'-]+/g, "|");
+    input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'\-]+/g, "|");
     matchRegex = new RegExp("(" + input + ")","i");
-  }
+  };
 
-  this.getRegex = function()
+  this.getRegex = function ()
   {
     return matchRegex.toString().replace(/^\/\\b\(|\)\\b\/i$/g, "").replace(/\|/g, " ");
-  }
+  };
 
   // recursively apply word highlighting
-  this.hiliteWords = function(node)
+  this.hiliteWords = function (node)
   {
-    if(node == undefined || !node) return;
+    var i;
+
+    if(!node) return;
     if(!matchRegex) return;
     if(skipTags.test(node.nodeName)) return;
 
     if(node.hasChildNodes()) {
-      for(var i=0; i < node.childNodes.length; i++)
+      for(i = 0; i < node.childNodes.length; i++)
         this.hiliteWords(node.childNodes[i]);
     }
     if(node.nodeType == 3) { // NODE_TEXT
@@ -54,7 +56,7 @@ function Hilitor(id, tag)
   };
 
   // remove highlighting
-  this.remove = function()
+  this.remove = function ()
   {
     var arr = document.getElementsByTagName(hiliteTag);
     while(arr.length && (el = arr[0])) {
@@ -63,9 +65,9 @@ function Hilitor(id, tag)
   };
 
   // start highlighting at target node
-  this.apply = function(input)
+  this.apply = function (input)
   {
-    if(input == undefined || !input) return;
+    if(!input) return;
     this.remove();
     this.setRegex(input);
     this.hiliteWords(targetNode);
