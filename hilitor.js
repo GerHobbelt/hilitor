@@ -4,6 +4,36 @@
 
 // License at http://www.the-art-of-web.com/copyright.html
 
+(function ( window, factory ) {
+
+  if ( typeof module === "object" && typeof module.exports === "object" ) {
+    // Expose a factory as module.exports in loaders that implement the Node
+    // module pattern (including browserify).
+    // This accentuates the need for a real window in the environment
+    // e.g. var jQuery = require("jquery")(window);
+    module.exports = function( w ) {
+      w = w || window;
+      if ( !w.document ) {
+        throw new Error("Hilitor requires a window with a document");
+      }
+      return factory( w.document );
+    };
+  } else {
+    if ( typeof define === "function" && define.amd ) {
+      // AMD. Register as a named module.
+      define( [], function() {
+        return factory(document);
+      });
+    } else {
+        // Browser globals
+        window.Hilitor = factory(document);
+    }
+  }
+
+// Pass this, window may not be defined yet
+}(this, function ( document, undefined ) {
+
+
 function Hilitor(id, tag, options)
 {
   var targetNode = document.getElementById(id) || document.body;
@@ -129,3 +159,7 @@ function Hilitor(id, tag, options)
     return options.onFinish.call(this);
   };
 }
+
+
+  return Hilitor;
+}));
