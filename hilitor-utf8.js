@@ -4,7 +4,6 @@
 
 function Hilitor(id, tag)
 {
-
     var targetNode = document.getElementById(id) || document.body;
     var hiliteTag = tag || "EM";
     var skipTags = new RegExp("^(?:" + hiliteTag + "|SCRIPT|FORM)$");
@@ -12,30 +11,32 @@ function Hilitor(id, tag)
     var wordColor = [];
     var colorIdx = 0;
     var matchRegex = "";
-    var openLeft = false;
-    var openRight = false;
+    var openLeft = true;
+    var openRight = true;
 
     this.setMatchType = function(type)
     {
         switch(type)
         {
-            case "left":
-                this.openLeft = false;
-                this.openRight = true;
-                break;
-            case "right":
-                this.openLeft = true;
-                this.openRight = false;
-                break;
-            case "open":
-                this.openLeft = this.openRight = true;
-                break;
-            default:
-                this.openLeft = this.openRight = false;
+        case "left":
+            this.openLeft = false;
+            this.openRight = true;
+            break;
+        case "right":
+            this.openLeft = true;
+            this.openRight = false;
+            break;
+        default:
+        case "open":
+            this.openLeft = this.openRight = true;
+            break;
+        case "complete":
+            this.openLeft = this.openRight = false;
+            break;
         }
     };
 
-    this.setRegex = function(input)
+    this.setRegex = function (input)
     {
         input = input.replace(/[^\w0-9\\u ]+/, "").replace(/[ ]+/g, "|");
         var re = "(" + input + ")";
@@ -44,18 +45,20 @@ function Hilitor(id, tag)
         matchRegex = new RegExp(re, "i");
     };
 
-    this.getRegex = function()
+    this.getRegex = function ()
     {
         var retval = matchRegex.toString();
-        retval = retval.replace(/(^\/(\\b)?|\(|\)|(\\b)?\/i$)/g, "");
+        retval = retval.replace(/^\/(\\b)?|\(|\)|(\\b)?\/i$/g, "");
         retval = retval.replace(/\|/g, " ");
         return retval;
     };
 
     // recursively apply word highlighting
-    this.hiliteWords = function(node)
+    this.hiliteWords = function (node)
     {
-        if(node == undefined || !node)
+        var i;
+	
+        if(!node)
             return;
         if(!matchRegex)
             return;
@@ -63,8 +66,9 @@ function Hilitor(id, tag)
             return;
 
         if(node.hasChildNodes()) {
-            for(var i=0; i < node.childNodes.length; i++)
+            for(i = 0; i < node.childNodes.length; i++) {
                 this.hiliteWords(node.childNodes[i]);
+            }
         }
         if(node.nodeType == 3) { // NODE_TEXT
             if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
@@ -83,11 +87,10 @@ function Hilitor(id, tag)
                 node.parentNode.insertBefore(match, after);
             }
         }
-        ;
     };
 
     // remove highlighting
-    this.remove = function()
+    this.remove = function ()
     {
         var arr = document.getElementsByTagName(hiliteTag);
         while(arr.length && (el = arr[0])) {
@@ -98,18 +101,16 @@ function Hilitor(id, tag)
     };
 
     // start highlighting at target node
-    this.apply = function(input)
+    this.apply = function (input)
     {
         input = convertCharStr2jEsc(input);
-        if(input === undefined || !input) {
-            this.remove();
-        }
         this.remove();
+        if(!input) return;
         this.setRegex(input);
         this.hiliteWords(targetNode);
     };
-
 }
+
 
 function dec2hex4(textString)
 {
@@ -127,7 +128,7 @@ function convertCharStr2jEsc(str, cstyle)
     var pad;
     var n = 0;
     var outputString = '';
-    for(var i=0; i < str.length; i++) {
+    for(var i = 0; i < str.length; i++) {
         var cc = str.charCodeAt(i);
         if(cc < 0 || cc > 0xFFFF) {
             outputString += '!Error in convertCharStr2UTF16: unexpected charCodeAt result, cc=' + cc + '!';
@@ -157,46 +158,47 @@ function convertCharStr2jEsc(str, cstyle)
         } else { // this is a BMP character
             switch(cc)
             {
-                case 0:
-                    outputString += '\\0';
-                    break;
-                case 8:
-                    outputString += '\\b';
-                    break;
-                case 9:
-                    outputString += '\\t';
-                    break;
-                case 10:
-                    outputString += '\\n';
-                    break;
-                case 13:
-                    outputString += '\\r';
-                    break;
-                case 11:
-                    outputString += '\\v';
-                    break;
-                case 12:
-                    outputString += '\\f';
-                    break;
-                case 34:
-                    outputString += '\\\"';
-                    break;
-                case 39:
-                    outputString += '\\\'';
-                    break;
-                case 92:
-                    outputString += '\\\\';
-                    break;
-                default:
-                    if(cc > 0x1f && cc < 0x7F) {
-                        outputString += String.fromCharCode(cc);
-                    } else {
-                        pad = cc.toString(16).toUpperCase();
-                        while(pad.length < 4) {
-                            pad = '0' + pad;
-                        }
-                        outputString += '\\u' + pad;
+            case 0:
+                outputString += '\\0';
+                break;
+            case 8:
+                outputString += '\\b';
+                break;
+            case 9:
+                outputString += '\\t';
+                break;
+            case 10:
+                outputString += '\\n';
+                break;
+            case 13:
+                outputString += '\\r';
+                break;
+            case 11:
+                outputString += '\\v';
+                break;
+            case 12:
+                outputString += '\\f';
+                break;
+            case 34:
+                outputString += '\\\"';
+                break;
+            case 39:
+                outputString += '\\\'';
+                break;
+            case 92:
+                outputString += '\\\\';
+                break;
+            default:
+                if(cc > 0x1f && cc < 0x7F) {
+                    outputString += String.fromCharCode(cc);
+                } else {
+                    pad = cc.toString(16).toUpperCase();
+                    while(pad.length < 4) {
+                        pad = '0' + pad;
                     }
+                    outputString += '\\u' + pad;
+                }
+                break;
             }
         }
     }

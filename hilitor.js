@@ -11,16 +11,46 @@ function Hilitor(id, tag)
   var wordColor = [];
   var colorIdx = 0;
   var matchRegex = "";
+  var openLeft = true;
+  var openRight = true;
+
+  this.setMatchType = function(type)
+  {
+    switch(type)
+    {
+    case "left":
+      this.openLeft = false;
+      this.openRight = true;
+      break;
+    case "right":
+      this.openLeft = true;
+      this.openRight = false;
+      break;
+    default:
+    case "open":
+      this.openLeft = this.openRight = true;
+      break;
+    case "complete":
+      this.openLeft = this.openRight = false;
+      break;
+    }
+  };
 
   this.setRegex = function (input)
   {
     input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'\-]+/g, "|");
-    matchRegex = new RegExp("(" + input + ")","i");
+    var re = "(" + input + ")";
+    if(!this.openLeft) re = "\\b" + re;
+    if(!this.openRight) re = re + "\\b";
+    matchRegex = new RegExp(re, "i");
   };
 
   this.getRegex = function ()
   {
-    return matchRegex.toString().replace(/^\/\\b\(|\)\\b\/i$/g, "").replace(/\|/g, " ");
+    var retval = matchRegex.toString();
+    retval = retval.replace(/^\/\\b\(|\)\\b\/i$/g, "");
+    retval = retval.replace(/\|/g, " ");
+    return retval;
   };
 
   // recursively apply word highlighting
@@ -28,13 +58,17 @@ function Hilitor(id, tag)
   {
     var i;
 
-    if(!node) return;
-    if(!matchRegex) return;
-    if(skipTags.test(node.nodeName)) return;
+    if(!node)
+        return;
+    if(!matchRegex)
+        return;
+    if(skipTags.test(node.nodeName))
+        return;
 
     if(node.hasChildNodes()) {
-      for(i = 0; i < node.childNodes.length; i++)
+      for(i = 0; i < node.childNodes.length; i++) {
         this.hiliteWords(node.childNodes[i]);
+      }
     }
     if(node.nodeType == 3) { // NODE_TEXT
       if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
@@ -67,8 +101,8 @@ function Hilitor(id, tag)
   // start highlighting at target node
   this.apply = function (input)
   {
-    if(!input) return;
     this.remove();
+    if(!input) return;
     this.setRegex(input);
     this.hiliteWords(targetNode);
   };
