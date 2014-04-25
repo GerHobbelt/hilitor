@@ -2,7 +2,7 @@
 // Please acknowledge use of this code by including this header.
 // 2/2013 jon: modified regex to display any match, not restricted to word boundaries.
 
-function Hilitor(id, tag)
+function Hilitor(id, tag, options)
 {
   var targetNode = document.getElementById(id) || document.body;
   var hiliteTag = tag || "EM";
@@ -13,6 +13,16 @@ function Hilitor(id, tag)
   var matchRegex = "";
   var openLeft = true;
   var openRight = true;
+  options = options || {};
+  if (typeof options.onStart !== 'function') {
+    options.onStart = function () { /* return FALSE when you want to abort */ };
+  }
+  if (typeof options.onFinish !== 'function') {
+    options.onFinish = function () { /* What you return here is returned by Hilitor.apply() */ return true; };
+  }
+  if (typeof options.onDoOne !== 'function') {
+    options.onDoOne = function (node) { /* return FALSE when you want to skip the highlighting change for this node */ };
+  }
 
   this.setMatchType = function(type)
   {
@@ -72,19 +82,21 @@ function Hilitor(id, tag)
     }
     if(node.nodeType == 3) { // NODE_TEXT
       if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
-        if(!wordColor[regs[0].toLowerCase()]) {
-          wordColor[regs[0].toLowerCase()] = colors[colorIdx++ % colors.length];
+        if (false !== options.onDoOne.call(this, node)) {
+          if(!wordColor[regs[0].toLowerCase()]) {
+            wordColor[regs[0].toLowerCase()] = colors[colorIdx++ % colors.length];
+          }
+
+          var match = document.createElement(hiliteTag);
+          match.appendChild(document.createTextNode(regs[0]));
+          match.style.backgroundColor = wordColor[regs[0].toLowerCase()];
+          match.style.fontStyle = "inherit";
+          match.style.color = "#000";
+
+          var after = node.splitText(regs.index);
+          after.nodeValue = after.nodeValue.substring(regs[0].length);
+          node.parentNode.insertBefore(match, after);
         }
-
-        var match = document.createElement(hiliteTag);
-        match.appendChild(document.createTextNode(regs[0]));
-        match.style.backgroundColor = wordColor[regs[0].toLowerCase()];
-        match.style.fontStyle = "inherit";
-        match.style.color = "#000";
-
-        var after = node.splitText(regs.index);
-        after.nodeValue = after.nodeValue.substring(regs[0].length);
-        node.parentNode.insertBefore(match, after);
       }
     }
   };
@@ -101,10 +113,18 @@ function Hilitor(id, tag)
   // start highlighting at target node
   this.apply = function (input)
   {
+    // always remove all highlight markers which have been done previously
     this.remove();
-    if(!input) return;
+    if(!input) {
+      return false;
+    }
     this.setRegex(input);
+    var rv = options.onStart.call(this);
+    if (rv === false) {
+      return rv;
+    }
     this.hiliteWords(targetNode);
+    return options.onFinish.call(this);
   };
 
 }
