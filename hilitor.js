@@ -95,39 +95,6 @@ function Hilitor(id, tag, options)
     return retval;
   };
 
-  function mergeTextNodes(textNode) {
-    if (!textNode || !textNode.parentNode) {
-      return textNode;
-    }
-    var leftSib = textNode;
-    var count = 0;
-    var node = leftSib;
-    while (node && node.nodeType === 3) {
-      leftSib = node;
-      count++;
-      node = node.previousSibling;
-    }
-    if (count < 2) {
-      return leftSib;
-    }
-    // merge the texts stored by the text nodes, producing a single replacement text node:
-    var text = [];
-    node = leftSib;
-    while (node && node.nodeType === 3) {
-      text.push(node.nodeValue);
-      node = node.nextSibling;
-    }
-    node = leftSib;
-    node.nodeValue = text.join("");
-    var n = node.nextSibling;
-    while (n && n.nodeType === 3) {
-      node = n.nextSibling;
-      n.parentNode.removeChild(n);
-      n = node;  
-    }
-    return leftSib;
-  }
-
   // recursively apply word highlighting
   this.hiliteWords = function (node)
   {
@@ -148,7 +115,6 @@ function Hilitor(id, tag, options)
       }
     }
     if(node.nodeType === 3) { // NODE_TEXT
-      node = mergeTextNodes(node);
       if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
         if (false !== options.onDoOne.call(this, node)) {
           if(!wordColor[regs[0].toLowerCase()]) {
@@ -175,40 +141,29 @@ function Hilitor(id, tag, options)
   {
     var arr, i;
     do {
-      try {
-        arr = document.querySelectorAll(hiliteTag + ".hilitor");
-        i = 0;
-        while (i < arr.length && (el = arr[i])) {
-          if (!el.parentNode) {
-            i++;      
-            // this entry would otherwise crash in the code below; we can however improve 
-            // on the total run-time costs by cutting back on the number of times we trigger
-            // the outer loop (which serves as a recovery mechanism anyway) by continuing
-            // with this querySelectorAll()'s results, but at it's higher indexes, which
-            // are very probably still valid/okay. This saves a number of outer loops and 
-            // thus a number of querySelectorAll calls.
-            continue;
-          }
-          // store the references to prev/next sibling of the hilite tag as that node itself, 
-          // and all its links, is invalidated in the next .replaceChild() call:
-          var prevSib = el.previousSibling;
-          var nextSib = el.nextSibling;
-          el.parentNode.replaceChild(el.firstChild, el);
-          // and merge the text snippets back together again.
-          //
-          // Note that this stuff can crash (due to the parentNode being nuked) when multiple
-          // snippets in the same text node sibling series are merged. That's what the
-          // try/catch is for plus the parentNode check (which is a later fix, but we don't
-          // have a will-never-crash guarantee with that one yet, so we keep the try/catch
-          // in here as well. Ugly. Even while the .querySelectorAll() 'array' is updated
-          // automatically, which would imply that this never occurs, yet: it does. :-(
-          if (prevSib) {
-            mergeTextNodes(prevSib.nextSibling);
-          } else if (nextSib) {
-            mergeTextNodes(nextSib.previousSibling);
-          }
+      arr = document.querySelectorAll(hiliteTag + ".hilitor");
+      i = 0;
+      while (i < arr.length && (el = arr[i])) {
+        // store the reference to the parent of the hilite tag as that node itself, 
+        // and all its links, is invalidated in the next .replaceChild() call:
+        var parentNode = el.parentNode;
+        if (!parentNode) {
+          i++;      
+          // this entry would otherwise crash in the code below; we can however improve 
+          // on the total run-time costs by cutting back on the number of times we trigger
+          // the outer loop (which serves as a recovery mechanism anyway) by continuing
+          // with this querySelectorAll()'s results, but at it's higher indexes, which
+          // are very probably still valid/okay. This saves a number of outer loops and 
+          // thus a number of querySelectorAll calls.
+          continue;
         }
-      } catch (e) {
+        // Note that this stuff can crash (due to the parentNode being nuked) when multiple
+        // snippets in the same text node sibling series are merged. That's what the
+        // parentNode check is for. Ugly. Even while the .querySelectorAll() 'array' is updated
+        // automatically, which would imply that this never occurs, yet: it does. :-(
+        parentNode.replaceChild(el.firstChild, el);
+        // and merge the text snippets back together again.
+        parentNode.normalize();
       }
     } while (arr.length > 0);
   };
@@ -226,6 +181,8 @@ function Hilitor(id, tag, options)
     if (rv === false) {
       return rv;
     }
+    // ensure all text node series are merged, etc. so that we don't have to bother with fragmented texts in the search/scan.
+    targetNode.normalize();
     this.hiliteWords(targetNode);
     return options.onFinish.call(this);
   };
