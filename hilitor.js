@@ -38,7 +38,7 @@ function Hilitor(id, tag, options)
 {
   var targetNode = document.getElementById(id) || document.body;
   var hiliteTag = tag || "EM";
-  var skipTags = new RegExp("^(?:" + hiliteTag + "|SCRIPT|FORM|SPAN)$");
+  var skipTags = new RegExp("^(?:SCRIPT|FORM|INPUT|TEXTAREA|IFRAME|VIDEO|AUDIO)$");
   var colors = ["#ff6", "#a0ffff", "#9f9", "#f99", "#f6f"];
   var wordColor = [];
   var colorIdx = 0;
@@ -95,24 +95,60 @@ function Hilitor(id, tag, options)
     return retval;
   };
 
+  function mergeTextNodes(textNode) {
+    if (!textNode || !textNode.parentNode) {
+      return textNode;
+    }
+    var leftSib = textNode;
+    var count = 0;
+    var node = leftSib;
+    while (node && node.nodeType === 3) {
+      leftSib = node;
+      count++;
+      node = node.previousSibling;
+    }
+    if (count < 2) {
+      return leftSib;
+    }
+    // merge the texts stored by the text nodes, producing a single replacement text node:
+    var text = [];
+    node = leftSib;
+    while (node && node.nodeType === 3) {
+      text.push(node.nodeValue);
+      node = node.nextSibling;
+    }
+    node = leftSib;
+    node.nodeValue = text.join("");
+    var n = node.nextSibling;
+    while (n && n.nodeType === 3) {
+      node = n.nextSibling;
+      n.parentNode.removeChild(n);
+      n = node;  
+    }
+    return leftSib;
+  }
+
   // recursively apply word highlighting
   this.hiliteWords = function (node)
   {
     var i;
 
     if(!node)
-        return;
+      return;
     if(!matchRegex)
-        return;
+      return;
     if(skipTags.test(node.nodeName))
-        return;
+       return;
+    if(node.nodeName === hiliteTag && node.className === "hilitor")
+      return;
 
     if(node.hasChildNodes()) {
       for(i = 0; i < node.childNodes.length; i++) {
         this.hiliteWords(node.childNodes[i]);
       }
     }
-    if(node.nodeType == 3) { // NODE_TEXT
+    if(node.nodeType === 3) { // NODE_TEXT
+      node = mergeTextNodes(node);
       if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
         if (false !== options.onDoOne.call(this, node)) {
           if(!wordColor[regs[0].toLowerCase()]) {
@@ -121,6 +157,7 @@ function Hilitor(id, tag, options)
 
           var match = document.createElement(hiliteTag);
           match.appendChild(document.createTextNode(regs[0]));
+          match.className = "hilitor";
           match.style.backgroundColor = wordColor[regs[0].toLowerCase()];
           match.style.fontStyle = "inherit";
           match.style.color = "#000";
@@ -136,10 +173,34 @@ function Hilitor(id, tag, options)
   // remove highlighting
   this.remove = function ()
   {
-    var arr = document.getElementsByTagName(hiliteTag);
-    while(arr.length && (el = arr[0])) {
-      el.parentNode.replaceChild(el.firstChild, el);
-    }
+    var arr;
+    do {
+      try {
+        arr = document.querySelectorAll(hiliteTag + ".hilitor");
+        while(arr.length && (el = arr[0])) {
+          var prevSib = el.previousSibling;
+          var nextSib = el.nextSibling;
+          if (!el.parentNode) {
+            break;
+          }
+          el.parentNode.replaceChild(el.firstChild, el);
+          // and merge the text snippets back together again.
+          //
+          // Note that this stuff can crash (due to the parentNode being nuked) when multiple
+          // snippets in the same text node sibling series are merged. That's what the
+          // try/catch is for plus the parentNode check (which is a later fix, but we don't
+          // have a will-never-crash guarantee with that one yet, so we keep the try/catch
+          // in here as well. Ugly. Even while the .querySelectorAll() 'array' is updated
+          // automatically, which would imply that this never occurs, yet: it does. :-(
+          if (prevSib) {
+            mergeTextNodes(prevSib.nextSibling);
+          } else if (nextSib) {
+            mergeTextNodes(nextSib.previousSibling);
+          }
+        }
+      } catch (e) {
+      }
+    } while (arr.length > 0);
   };
 
   // start highlighting at target node
