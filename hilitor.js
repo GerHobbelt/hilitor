@@ -173,16 +173,26 @@ function Hilitor(id, tag, options)
   // remove highlighting
   this.remove = function ()
   {
-    var arr;
+    var arr, i;
     do {
       try {
         arr = document.querySelectorAll(hiliteTag + ".hilitor");
-        while(arr.length && (el = arr[0])) {
+        i = 0;
+        while (i < arr.length && (el = arr[i])) {
+          if (!el.parentNode) {
+            i++;      
+            // this entry would otherwise crash in the code below; we can however improve 
+            // on the total run-time costs by cutting back on the number of times we trigger
+            // the outer loop (which serves as a recovery mechanism anyway) by continuing
+            // with this querySelectorAll()'s results, but at it's higher indexes, which
+            // are very probably still valid/okay. This saves a number of outer loops and 
+            // thus a number of querySelectorAll calls.
+            continue;
+          }
+          // store the references to prev/next sibling of the hilite tag as that node itself, 
+          // and all its links, is invalidated in the next .replaceChild() call:
           var prevSib = el.previousSibling;
           var nextSib = el.nextSibling;
-          if (!el.parentNode) {
-            break;
-          }
           el.parentNode.replaceChild(el.firstChild, el);
           // and merge the text snippets back together again.
           //
