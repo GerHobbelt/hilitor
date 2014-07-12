@@ -62,19 +62,19 @@ function Hilitor(id, tag, options)
         switch(type)
         {
         case "left":
-            this.openLeft = false;
-            this.openRight = true;
+            openLeft = false;
+            openRight = true;
             break;
         case "right":
-            this.openLeft = true;
-            this.openRight = false;
+            openLeft = true;
+            openRight = false;
             break;
         default:
         case "open":
-            this.openLeft = this.openRight = true;
+            openLeft = openRight = true;
             break;
         case "complete":
-            this.openLeft = this.openRight = false;
+            openLeft = openRight = false;
             break;
         }
     };
@@ -83,15 +83,15 @@ function Hilitor(id, tag, options)
     {
         input = input.replace(/[^\w0-9\\u ]+/, "").replace(/[ ]+/g, "|");
         var re = "(" + input + ")";
-        if(!this.openLeft) re = "\\b" + re;
-        if(!this.openRight) re = re + "\\b";
+        if(!openLeft) re = "\\b" + re;
+        if(!openRight) re = re + "\\b";
         matchRegex = new RegExp(re, "i");
     };
 
     this.getRegex = function ()
     {
         var retval = matchRegex.toString();
-        retval = retval.replace(/^\/(\\b)?|\(|\)|(\\b)?\/i$/g, "");
+        retval = retval.replace(/^\/(\\b)?|(\\b)?\/i$/g, "");
         retval = retval.replace(/\|/g, " ");
         return retval;
     };

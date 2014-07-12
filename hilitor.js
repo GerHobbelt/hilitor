@@ -90,7 +90,7 @@ function Hilitor(id, tag, options)
   this.getRegex = function ()
   {
     var retval = matchRegex.toString();
-    retval = retval.replace(/^\/\\b\(|\)\\b\/i$/g, "");
+    retval = retval.replace(/^\/(\\b)?|(\\b)?\/i$/g, "");
     retval = retval.replace(/\|/g, " ");
     return retval;
   };
