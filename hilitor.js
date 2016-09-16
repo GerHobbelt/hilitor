@@ -45,6 +45,7 @@ function Hilitor(id, tag, options)
   var matchRegex = "";
   var openLeft = true;
   var openRight = true;
+  var phraseOnly = false;
   options = options || {};
   if (typeof options.onStart !== 'function') {
     options.onStart = function () { /* return FALSE when you want to abort */ };
@@ -77,10 +78,24 @@ function Hilitor(id, tag, options)
       break;
     }
   };
-
+  
+  this.setPhraseMatching = function(value){
+    switch(value){
+      case true:
+        this.phraseOnly = true;
+        break;
+      case false:
+        this.phraseOnly = false;
+        break;
+      default:
+        this.phraseOnly = false;
+    }
+  }
   this.setRegex = function (input)
   {
-    input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'\-]+/g, "|");
+    if(!this.phraseOnly){
+      input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'\-]+/g, "|");
+    }
     var re = "(" + input + ")";
     if(!openLeft) re = "\\b" + re;
     if(!openRight) re = re + "\\b";
