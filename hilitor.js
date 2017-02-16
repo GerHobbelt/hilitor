@@ -38,7 +38,7 @@ function Hilitor(id, tag, options)
 {
   var targetNode = document.getElementById(id) || document.body;
   var hiliteTag = tag || "EM";
-  var skipTags = new RegExp("^(?:SCRIPT|FORM|INPUT|TEXTAREA|IFRAME|VIDEO|AUDIO)$");
+  var skipTags = new RegExp("^(?:" + hiliteTag + "|SCRIPT|FORM)$");
   var colors = ["#ff6", "#a0ffff", "#9f9", "#f99", "#f6f"];
   var wordColor = [];
   var colorIdx = 0;
@@ -78,20 +78,49 @@ function Hilitor(id, tag, options)
     }
   };
 
+  function addAccents(input)
+  {
+    retval = input;
+    retval = retval.replace(/([ao])e/ig, "$1");
+    retval = retval.replace(/\\u00E[024]/ig, "a");
+    retval = retval.replace(/\\u00E7/ig, "c");
+    retval = retval.replace(/\\u00E[89AB]/ig, "e");
+    retval = retval.replace(/\\u00E[EF]/ig, "i");
+    retval = retval.replace(/\\u00F[46]/ig, "o");
+    retval = retval.replace(/\\u00F[9BC]/ig, "u");
+    retval = retval.replace(/\\u00FF/ig, "y");
+    retval = retval.replace(/\\u00DF/ig, "s");
+    retval = retval.replace(/a/ig, "([aàâä]|ae)");
+    retval = retval.replace(/c/ig, "[cç]");
+    retval = retval.replace(/e/ig, "[eèéêë]");
+    retval = retval.replace(/i/ig, "[iîï]");
+    retval = retval.replace(/o/ig, "([oôö]|oe)");
+    retval = retval.replace(/u/ig, "[uùûü]");
+    retval = retval.replace(/y/ig, "[yÿ]");
+    retval = retval.replace(/s/ig, "(ss|[sß])");
+    return retval;
+  }
+
   this.setRegex = function (input)
   {
-    input = input.replace(/^[^\w]+|[^\w]+$/g, "").replace(/[^\w'\-]+/g, "|");
-    var re = "(" + input + ")";
-    if(!openLeft) re = "\\b" + re;
-    if(!openRight) re = re + "\\b";
-    matchRegex = new RegExp(re, "i");
+    input = input.replace(/\\([^u]|$)/g, "$1");
+    input = input.replace(/[^\w\\\s']+/g, "").replace(/\s+/g, "|");
+    input = input.replace(/^\||\|$/g, "");
+    input = addAccents(input);
+    if(input) {
+      var re = "(" + input + ")";
+      if(!openLeft) re = "(?:^|[\\b\\s])" + re;
+      if(!openRight) re = re + "(?:[\\b\\s]|$)";
+      matchRegex = new RegExp(re, "i");
+      return true;
+    }
+    return false;
   };
 
   this.getRegex = function ()
   {
     var retval = matchRegex.toString();
-    retval = retval.replace(/^\/(\\b)?|(\\b)?\/i$/g, "");
-    retval = retval.replace(/\|/g, " ");
+    retval = retval.replace(/(^\/|\(\?:[^\)]+\)|\/i$)/g, "");
     return retval;
   };
 
@@ -105,7 +134,7 @@ function Hilitor(id, tag, options)
     if(!matchRegex)
       return;
     if(skipTags.test(node.nodeName))
-       return;
+      return;
     if(node.nodeName === hiliteTag && node.className === "hilitor")
       return;
 
@@ -116,22 +145,24 @@ function Hilitor(id, tag, options)
     }
     if(node.nodeType === 3) { // NODE_TEXT
       if((nv = node.nodeValue) && (regs = matchRegex.exec(nv))) {
-        if (false !== options.onDoOne.call(this, node)) {
-          if(!wordColor[regs[0].toLowerCase()]) {
-            wordColor[regs[0].toLowerCase()] = colors[colorIdx++ % colors.length];
-          }
-
-          var match = document.createElement(hiliteTag);
-          match.appendChild(document.createTextNode(regs[0]));
-          match.className = "hilitor";
-          match.style.backgroundColor = wordColor[regs[0].toLowerCase()];
-          match.style.fontStyle = "inherit";
-          match.style.color = "#000";
-
-          var after = node.splitText(regs.index);
-          after.nodeValue = after.nodeValue.substring(regs[0].length);
-          node.parentNode.insertBefore(match, after);
+        if(!wordColor[regs[1].toLowerCase()]) {
+          wordColor[regs[1].toLowerCase()] = colors[colorIdx++ % colors.length];
         }
+
+        var match = document.createElement(hiliteTag);
+        match.appendChild(document.createTextNode(regs[1]));
+        match.style.backgroundColor = wordColor[regs[1].toLowerCase()];
+        match.style.fontStyle = "inherit";
+        match.style.color = "#000";
+
+        var after;
+        if(regs[0].match(/^\s/)) { // in case of leading whitespace
+          after = node.splitText(regs.index + 1);
+        } else {
+          after = node.splitText(regs.index);
+        }
+        after.nodeValue = after.nodeValue.substring(regs[1].length);
+        node.parentNode.insertBefore(match, after);
       }
     }
   };
@@ -139,33 +170,12 @@ function Hilitor(id, tag, options)
   // remove highlighting
   this.remove = function ()
   {
-    var arr, i;
-    do {
-      arr = document.querySelectorAll(hiliteTag + ".hilitor");
-      i = 0;
-      while (i < arr.length && (el = arr[i])) {
-        // store the reference to the parent of the hilite tag as that node itself, 
-        // and all its links, is invalidated in the next .replaceChild() call:
-        var parentNode = el.parentNode;
-        if (!parentNode) {
-          i++;      
-          // this entry would otherwise crash in the code below; we can however improve 
-          // on the total run-time costs by cutting back on the number of times we trigger
-          // the outer loop (which serves as a recovery mechanism anyway) by continuing
-          // with this querySelectorAll()'s results, but at it's higher indexes, which
-          // are very probably still valid/okay. This saves a number of outer loops and 
-          // thus a number of querySelectorAll calls.
-          continue;
-        }
-        // Note that this stuff can crash (due to the parentNode being nuked) when multiple
-        // snippets in the same text node sibling series are merged. That's what the
-        // parentNode check is for. Ugly. Even while the .querySelectorAll() 'array' is updated
-        // automatically, which would imply that this never occurs, yet: it does. :-(
-        parentNode.replaceChild(el.firstChild, el);
-        // and merge the text snippets back together again.
-        parentNode.normalize();
-      }
-    } while (arr.length > 0);
+    var arr = document.getElementsByTagName(hiliteTag);
+    while(arr.length && (el = arr[0])) {
+      var parent = el.parentNode;
+      parent.replaceChild(el.firstChild, el);
+      parent.normalize();
+    }
   };
 
   // start highlighting at target node
@@ -173,19 +183,105 @@ function Hilitor(id, tag, options)
   {
     // always remove all highlight markers which have been done previously
     this.remove();
-    if(!input) {
-      return false;
+    if(input === undefined || !(input = input.replace(/(^\s+|\s+$)/g, ""))) return;
+    input = convertCharStr2jEsc(input);
+    if(this.setRegex(input)) {
+      this.hiliteWords(targetNode);
     }
-    this.setRegex(input);
-    var rv = options.onStart.call(this);
-    if (rv === false) {
-      return rv;
-    }
-    // ensure all text node series are merged, etc. so that we don't have to bother with fragmented texts in the search/scan.
-    targetNode.normalize();
-    this.hiliteWords(targetNode);
-    return options.onFinish.call(this);
   };
+
+  // added by Yanosh Kunsh to include utf-8 string comparison
+  function dec2hex4(textString)
+  {
+    var hexequiv = new Array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F");
+    return hexequiv[(textString >> 12) & 0xF] + hexequiv[(textString >> 8) & 0xF] + hexequiv[(textString >> 4) & 0xF] + hexequiv[textString & 0xF];
+  }
+
+  function convertCharStr2jEsc(str, cstyle)
+  {
+    // Converts a string of characters to JavaScript escapes
+    // str: sequence of Unicode characters
+    var highsurrogate = 0;
+    var suppCP;
+    var pad;
+    var n = 0;
+    var outputString = '';
+    for(var i=0; i < str.length; i++) {
+      var cc = str.charCodeAt(i);
+      if(cc < 0 || cc > 0xFFFF) {
+        outputString += '!Error in convertCharStr2UTF16: unexpected charCodeAt result, cc=' + cc + '!';
+      }
+      if(highsurrogate != 0) { // this is a supp char, and cc contains the low surrogate
+        if(0xDC00 <= cc && cc <= 0xDFFF) {
+          suppCP = 0x10000 + ((highsurrogate - 0xD800) << 10) + (cc - 0xDC00);
+          if(cstyle) {
+            pad = suppCP.toString(16);
+            while(pad.length < 8) {
+              pad = '0' + pad;
+            }
+            outputString += '\\U' + pad;
+          } else {
+            suppCP -= 0x10000;
+            outputString += '\\u' + dec2hex4(0xD800 | (suppCP >> 10)) + '\\u' + dec2hex4(0xDC00 | (suppCP & 0x3FF));
+          }
+          highsurrogate = 0;
+          continue;
+        } else {
+          outputString += 'Error in convertCharStr2UTF16: low surrogate expected, cc=' + cc + '!';
+          highsurrogate = 0;
+        }
+      }
+      if(0xD800 <= cc && cc <= 0xDBFF) { // start of supplementary character
+        highsurrogate = cc;
+      } else { // this is a BMP character
+        switch(cc)
+        {
+          case 0:
+            outputString += '\\0';
+            break;
+          case 8:
+            outputString += '\\b';
+            break;
+          case 9:
+            outputString += '\\t';
+            break;
+          case 10:
+            outputString += '\\n';
+            break;
+          case 13:
+            outputString += '\\r';
+            break;
+          case 11:
+            outputString += '\\v';
+            break;
+          case 12:
+            outputString += '\\f';
+            break;
+          case 34:
+            outputString += '\\\"';
+            break;
+          case 39:
+            outputString += '\\\'';
+            break;
+          case 92:
+            outputString += '\\\\';
+            break;
+          default:
+            if(cc > 0x1f && cc < 0x7F) {
+              outputString += String.fromCharCode(cc);
+            } else {
+              pad = cc.toString(16).toUpperCase();
+              while(pad.length < 4) {
+                pad = '0' + pad;
+              }
+              outputString += '\\u' + pad;
+            }
+        }
+      }
+    }
+    return outputString;
+  }
+
 }
 
 
